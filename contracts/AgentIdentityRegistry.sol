@@ -243,16 +243,6 @@ contract AgentIdentityRegistry is IERC721Metadata {
         emit Approval(owner, to, tokenId);
     }
 
-    function approveTo(uint256 tokenId, address to) external override {
-        address owner = _owners[tokenId];
-        require(
-            msg.sender == owner || _operatorApprovals[owner][msg.sender],
-            "AgentIdentityRegistry: not owner or operator"
-        );
-        _tokenApprovals[tokenId] = to;
-        emit Approval(owner, to, tokenId);
-    }
-
     function getApproved(
         uint256 tokenId
     ) external view override returns (address) {
@@ -303,7 +293,7 @@ contract AgentIdentityRegistry is IERC721Metadata {
         address from,
         address to,
         uint256 tokenId,
-        bytes calldata data
+        bytes memory data
     ) public override {
         require(
             _isApprovedOrOwner(msg.sender, tokenId),
