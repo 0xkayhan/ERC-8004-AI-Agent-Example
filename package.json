@@ -1,0 +1,10 @@
+{
+  "name": "erc-8004-ai-agent-example",
+  "version": "1.0.0",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "hardhat": "^3.4.0",
+    "typescript": "~5.8.0"
+  }
+}

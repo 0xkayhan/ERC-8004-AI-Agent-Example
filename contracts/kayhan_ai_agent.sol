@@ -41,21 +41,30 @@ pragma solidity ^0.8.20;
 interface IAgentIdentityRegistry {
     struct MetadataEntry {
         string metadataKey;
-        bytes  metadataValue;
+        bytes metadataValue;
     }
 
-    function register(string calldata agentURI, MetadataEntry[] calldata metadata)
-        external returns (uint256 agentId);
+    function register(
+        string calldata agentURI,
+        MetadataEntry[] calldata metadata
+    ) external returns (uint256 agentId);
 
-    function register(string calldata agentURI) external returns (uint256 agentId);
+    function register(
+        string calldata agentURI
+    ) external returns (uint256 agentId);
 
     function setAgentURI(uint256 agentId, string calldata newURI) external;
 
-    function getMetadata(uint256 agentId, string memory metadataKey)
-        external view returns (bytes memory);
+    function getMetadata(
+        uint256 agentId,
+        string memory metadataKey
+    ) external view returns (bytes memory);
 
-    function setMetadata(uint256 agentId, string memory metadataKey, bytes memory metadataValue)
-        external;
+    function setMetadata(
+        uint256 agentId,
+        string memory metadataKey,
+        bytes memory metadataValue
+    ) external;
 
     function getAgentWallet(uint256 agentId) external view returns (address);
 
@@ -67,12 +76,12 @@ interface IAgentIdentityRegistry {
 interface IAgentReputationRegistry {
     function giveFeedback(
         uint256 agentId,
-        int128  value,
-        uint8   valueDecimals,
-        string  calldata tag1,
-        string  calldata tag2,
-        string  calldata endpoint,
-        string  calldata feedbackURI,
+        int128 value,
+        uint8 valueDecimals,
+        string calldata tag1,
+        string calldata tag2,
+        string calldata endpoint,
+        string calldata feedbackURI,
         bytes32 feedbackHash
     ) external;
 
@@ -81,28 +90,40 @@ interface IAgentReputationRegistry {
     function getSummary(
         uint256 agentId,
         address[] calldata clientAddresses,
-        string  calldata tag1,
-        string  calldata tag2
-    ) external view returns (uint64 count, int128 summaryValue, uint8 summaryValueDecimals);
+        string calldata tag1,
+        string calldata tag2
+    )
+        external
+        view
+        returns (uint64 count, int128 summaryValue, uint8 summaryValueDecimals);
 
-    function getClients(uint256 agentId) external view returns (address[] memory);
+    function getClients(
+        uint256 agentId
+    ) external view returns (address[] memory);
 
-    function getLastIndex(uint256 agentId, address clientAddress) external view returns (uint64);
+    function getLastIndex(
+        uint256 agentId,
+        address clientAddress
+    ) external view returns (uint64);
 }
 
 interface IAgentValidationRegistry {
     function validationRequest(
         address validatorAddress,
         uint256 agentId,
-        string  calldata requestURI,
+        string calldata requestURI,
         bytes32 requestHash
     ) external;
 
-    function getValidationStatus(bytes32 requestHash)
-        external view returns (
+    function getValidationStatus(
+        bytes32 requestHash
+    )
+        external
+        view
+        returns (
             address validatorAddress,
             uint256 agentId,
-            uint8   response,
+            uint8 response,
             bytes32 responseHash,
             string memory tag,
             uint256 lastUpdate
@@ -111,20 +132,19 @@ interface IAgentValidationRegistry {
     function getSummary(
         uint256 agentId,
         address[] calldata validatorAddresses,
-        string  calldata tag
+        string calldata tag
     ) external view returns (uint64 count, uint8 averageResponse);
 }
 
 // ─── KayhanAIAgent ────────────────────────────────────────────────────────────
 
 contract KayhanAIAgent {
-
     // ── Events ────────────────────────────────────────────────────────────────
 
     /// @notice Emitted when a new agent is registered through this contract.
     event AgentRegistered(
         uint256 indexed agentId,
-        string          agentURI,
+        string agentURI,
         address indexed owner
     );
 
@@ -132,23 +152,23 @@ contract KayhanAIAgent {
     event FeedbackSubmitted(
         uint256 indexed agentId,
         address indexed client,
-        int128          value,
-        uint8           valueDecimals,
-        string          tag1
+        int128 value,
+        uint8 valueDecimals,
+        string tag1
     );
 
     /// @notice Emitted when a validation request is created via this contract.
     event ValidationRequested(
         uint256 indexed agentId,
         address indexed validatorAddress,
-        bytes32         requestHash
+        bytes32 requestHash
     );
 
     // ── State ─────────────────────────────────────────────────────────────────
 
     address public immutable owner;
 
-    IAgentIdentityRegistry   public immutable identityRegistry;
+    IAgentIdentityRegistry public immutable identityRegistry;
     IAgentReputationRegistry public immutable reputationRegistry;
     IAgentValidationRegistry public immutable validationRegistry;
 
@@ -177,14 +197,23 @@ contract KayhanAIAgent {
         address reputationRegistry_,
         address validationRegistry_
     ) {
-        require(identityRegistry_   != address(0), "KayhanAIAgent: zero identity address");
-        require(reputationRegistry_ != address(0), "KayhanAIAgent: zero reputation address");
-        require(validationRegistry_ != address(0), "KayhanAIAgent: zero validation address");
+        require(
+            identityRegistry_ != address(0),
+            "KayhanAIAgent: zero identity address"
+        );
+        require(
+            reputationRegistry_ != address(0),
+            "KayhanAIAgent: zero reputation address"
+        );
+        require(
+            validationRegistry_ != address(0),
+            "KayhanAIAgent: zero validation address"
+        );
 
-        owner               = msg.sender;
-        identityRegistry    = IAgentIdentityRegistry(identityRegistry_);
-        reputationRegistry  = IAgentReputationRegistry(reputationRegistry_);
-        validationRegistry  = IAgentValidationRegistry(validationRegistry_);
+        owner = msg.sender;
+        identityRegistry = IAgentIdentityRegistry(identityRegistry_);
+        reputationRegistry = IAgentReputationRegistry(reputationRegistry_);
+        validationRegistry = IAgentValidationRegistry(validationRegistry_);
     }
 
     // ── Agent Registration ────────────────────────────────────────────────────
@@ -212,15 +241,15 @@ contract KayhanAIAgent {
         string calldata modelName
     ) external onlyOwner returns (uint256 agentId) {
         // Build metadata entries
-        IAgentIdentityRegistry.MetadataEntry[] memory meta =
-            new IAgentIdentityRegistry.MetadataEntry[](2);
+        IAgentIdentityRegistry.MetadataEntry[]
+            memory meta = new IAgentIdentityRegistry.MetadataEntry[](2);
 
         meta[0] = IAgentIdentityRegistry.MetadataEntry({
-            metadataKey:   "name",
+            metadataKey: "name",
             metadataValue: bytes(agentName)
         });
         meta[1] = IAgentIdentityRegistry.MetadataEntry({
-            metadataKey:   "model",
+            metadataKey: "model",
             metadataValue: bytes(modelName)
         });
 
@@ -236,7 +265,10 @@ contract KayhanAIAgent {
      * @notice Update the registration file URI for an existing agent.
      * @dev    Use a base64-encoded data URI to store the registration file fully on-chain.
      */
-    function updateAgentURI(uint256 agentId, string calldata newURI) external onlyOwner {
+    function updateAgentURI(
+        uint256 agentId,
+        string calldata newURI
+    ) external onlyOwner {
         identityRegistry.setAgentURI(agentId, newURI);
     }
 
@@ -246,8 +278,8 @@ contract KayhanAIAgent {
      */
     function setAgentMetadata(
         uint256 agentId,
-        string  calldata key,
-        bytes   calldata value
+        string calldata key,
+        bytes calldata value
     ) external onlyOwner {
         identityRegistry.setMetadata(agentId, key, value);
     }
@@ -275,12 +307,12 @@ contract KayhanAIAgent {
      */
     function giveFeedback(
         uint256 agentId,
-        int128  value,
-        uint8   valueDecimals,
-        string  calldata tag1,
-        string  calldata tag2,
-        string  calldata endpoint,
-        string  calldata feedbackURI,
+        int128 value,
+        uint8 valueDecimals,
+        string calldata tag1,
+        string calldata tag2,
+        string calldata endpoint,
+        string calldata feedbackURI,
         bytes32 feedbackHash
     ) external {
         reputationRegistry.giveFeedback(
@@ -303,19 +335,29 @@ contract KayhanAIAgent {
      * @param  stars    Star rating from 1 to 5.
      * @param  endpoint OPTIONAL — agent endpoint the rating applies to.
      */
-    function rateAgent(uint256 agentId, uint8 stars, string calldata endpoint) external {
+    function rateAgent(
+        uint256 agentId,
+        uint8 stars,
+        string calldata endpoint
+    ) external {
         require(stars >= 1 && stars <= 5, "KayhanAIAgent: stars must be 1-5");
         reputationRegistry.giveFeedback(
             agentId,
-            int128(uint128(stars)),   // e.g., 4 for ★★★★☆
-            0,                        // valueDecimals=0, so value is integer stars
+            int128(uint128(stars)), // e.g., 4 for ★★★★☆
+            0, // valueDecimals=0, so value is integer stars
             "starred",
             "",
             endpoint,
             "",
             bytes32(0)
         );
-        emit FeedbackSubmitted(agentId, msg.sender, int128(uint128(stars)), 0, "starred");
+        emit FeedbackSubmitted(
+            agentId,
+            msg.sender,
+            int128(uint128(stars)),
+            0,
+            "starred"
+        );
     }
 
     /**
@@ -336,14 +378,15 @@ contract KayhanAIAgent {
     function getAgentScore(
         uint256 agentId,
         address[] calldata clientAddresses,
-        string  calldata tag1,
-        string  calldata tag2
+        string calldata tag1,
+        string calldata tag2
     )
         external
         view
         returns (uint64 count, int128 summaryValue, uint8 summaryValueDecimals)
     {
-        return reputationRegistry.getSummary(agentId, clientAddresses, tag1, tag2);
+        return
+            reputationRegistry.getSummary(agentId, clientAddresses, tag1, tag2);
     }
 
     // ── Validation ────────────────────────────────────────────────────────────
@@ -367,7 +410,7 @@ contract KayhanAIAgent {
     function requestValidation(
         uint256 agentId,
         address validatorAddress,
-        string  calldata requestURI,
+        string calldata requestURI,
         bytes32 requestHash
     ) external onlyOwner {
         validationRegistry.validationRequest(
@@ -382,15 +425,17 @@ contract KayhanAIAgent {
     /**
      * @notice Check the status of a previously submitted validation request.
      */
-    function checkValidation(bytes32 requestHash)
+    function checkValidation(
+        bytes32 requestHash
+    )
         external
         view
         returns (
             address validatorAddress,
             uint256 agentId,
-            uint8   response,
+            uint8 response,
             bytes32 responseHash,
-            string  memory tag,
+            string memory tag,
             uint256 lastUpdate
         )
     {
@@ -409,7 +454,7 @@ contract KayhanAIAgent {
     function getValidationScore(
         uint256 agentId,
         address[] calldata validatorAddresses,
-        string  calldata tag
+        string calldata tag
     ) external view returns (uint64 count, uint8 averageResponse) {
         return validationRegistry.getSummary(agentId, validatorAddresses, tag);
     }
@@ -427,22 +472,24 @@ contract KayhanAIAgent {
     }
 
     /// @notice Returns the full on-chain info for an agent.
-    function getAgentInfo(uint256 agentId)
+    function getAgentInfo(
+        uint256 agentId
+    )
         external
         view
         returns (
             address agentOwner,
-            string  memory agentURI,
-            string  memory agentName,
+            string memory agentURI,
+            string memory agentName,
             address agentWallet,
-            bytes   memory modelName
+            bytes memory modelName
         )
     {
-        agentOwner  = identityRegistry.ownerOf(agentId);
-        agentURI    = identityRegistry.tokenURI(agentId);
-        agentName   = agentNames[agentId];
+        agentOwner = identityRegistry.ownerOf(agentId);
+        agentURI = identityRegistry.tokenURI(agentId);
+        agentName = agentNames[agentId];
         agentWallet = identityRegistry.getAgentWallet(agentId);
-        modelName   = identityRegistry.getMetadata(agentId, "model");
+        modelName = identityRegistry.getMetadata(agentId, "model");
     }
 }
 
@@ -464,19 +511,22 @@ contract KayhanAIAgent {
 interface IValidationRegistry {
     function validationResponse(
         bytes32 requestHash,
-        uint8   response,
-        string  calldata responseURI,
+        uint8 response,
+        string calldata responseURI,
         bytes32 responseHash,
-        string  calldata tag
+        string calldata tag
     ) external;
 }
 
 contract ExampleValidator {
-
     address public immutable owner;
     IValidationRegistry public immutable validationRegistry;
 
-    event ValidationCompleted(bytes32 indexed requestHash, uint8 response, string tag);
+    event ValidationCompleted(
+        bytes32 indexed requestHash,
+        uint8 response,
+        string tag
+    );
 
     modifier onlyOwner() {
         require(msg.sender == owner, "ExampleValidator: not owner");
@@ -484,8 +534,11 @@ contract ExampleValidator {
     }
 
     constructor(address validationRegistry_) {
-        require(validationRegistry_ != address(0), "ExampleValidator: zero address");
-        owner              = msg.sender;
+        require(
+            validationRegistry_ != address(0),
+            "ExampleValidator: zero address"
+        );
+        owner = msg.sender;
         validationRegistry = IValidationRegistry(validationRegistry_);
     }
 
@@ -500,10 +553,10 @@ contract ExampleValidator {
      */
     function submitValidation(
         bytes32 requestHash,
-        uint8   response,
-        string  calldata responseURI,
+        uint8 response,
+        string calldata responseURI,
         bytes32 responseHash,
-        string  calldata tag
+        string calldata tag
     ) external onlyOwner {
         require(response <= 100, "ExampleValidator: response > 100");
         validationRegistry.validationResponse(
@@ -516,6 +569,14 @@ contract ExampleValidator {
         emit ValidationCompleted(requestHash, response, tag);
     }
 
+    function f(uint8 _in) public pure returns (uint8 out) {
+        out = _in;
+    }
+
+    function f(uint256 _in) public pure returns (uint256 out) {
+        out = _in;
+    }
+
     /**
      * @notice Convenience: submit a binary pass/fail with an optional IPFS evidence link.
      * @param requestHash  The request to validate.
@@ -524,8 +585,8 @@ contract ExampleValidator {
      */
     function submitBinaryResult(
         bytes32 requestHash,
-        bool    passed,
-        string  calldata evidenceURI
+        bool passed,
+        string calldata evidenceURI
     ) external onlyOwner {
         uint8 response = passed ? 100 : 0;
         validationRegistry.validationResponse(
@@ -535,6 +596,10 @@ contract ExampleValidator {
             bytes32(0), // IPFS — no hash needed
             passed ? "pass" : "fail"
         );
-        emit ValidationCompleted(requestHash, response, passed ? "pass" : "fail");
+        emit ValidationCompleted(
+            requestHash,
+            response,
+            passed ? "pass" : "fail"
+        );
     }
 }
