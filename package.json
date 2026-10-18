@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.0.11",
+    "@nomicfoundation/hardhat-network-helpers": "^3.0.9",
+    "@nomicfoundation/hardhat-node-test-runner": "^3.0.16",
     "@types/node": "^22.19.17",
+    "dotenv": "^18.0.8",
+    "ethers": "^6.17.0",
     "hardhat": "^3.4.0",
     "typescript": "~5.8.0"
   }

@@ -16,6 +16,9 @@
 # Typechain output
 /types
 
+# Local deployment records (produced by scripts/kayhan_ai_agent.ts)
+/deployments
+
 # Environment files
 .env
 .env.*

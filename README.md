@@ -92,6 +92,87 @@ validation.validationRequest(
 );
 ```
 
+## Deployment (Hardhat)
+
+The Quickstart above shows the protocol flow in Solidity. For a runnable
+deployment, this repository ships `scripts/kayhan_ai_agent.ts`, which deploys the
+whole stack in dependency order, verifies the wiring, and writes the resulting
+addresses to `deployments/<network>.json`.
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure the environment
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Required | Description |
+|---|---|---|
+| `PRIVATE_KEY` | Non-local networks | Deployer private key. Never commit one that holds real funds. |
+| `SEPOLIA_RPC_URL` | Sepolia | RPC endpoint, e.g. Alchemy, Infura or a public node. |
+| `LOCALHOST_RPC_URL` | Optional | Defaults to `http://127.0.0.1:8545`. |
+| `REGISTER_DEMO_AGENT` | Optional | Set to `true` to register a sample agent after deploying. |
+
+### 3. Deploy
+
+```bash
+# In-memory network — fastest, state is discarded when the command exits.
+npx hardhat run scripts/kayhan_ai_agent.ts
+
+# Local node — persistent chain, handy for wallet and frontend testing.
+npx hardhat node
+npx hardhat run scripts/kayhan_ai_agent.ts --network localhost
+
+# Sepolia testnet — requires PRIVATE_KEY and SEPOLIA_RPC_URL.
+npx hardhat run scripts/kayhan_ai_agent.ts --network sepolia
+```
+
+### 4. What gets deployed
+
+| # | Contract | Constructor arguments |
+|---|---|---|
+| 1 | `AgentIdentityRegistry` | — |
+| 2 | `AgentReputationRegistry` | identity registry address |
+| 3 | `AgentValidationRegistry` | identity registry address |
+| 4 | `ExampleValidator` | validation registry address |
+| 5 | `KayhanAIAgent` | identity, reputation and validation registry addresses |
+
+The script then calls `getIdentityRegistry()` on both registries to confirm they
+point at the identity registry, and — when `REGISTER_DEMO_AGENT=true` — registers
+one demo agent through `KayhanAIAgent`.
+
+### 5. Deployment record
+
+Each run writes a JSON record containing the chain id, the deployer and every
+contract address:
+
+```json
+{
+  "network": "localhost",
+  "chainId": 31337,
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "contracts": {
+    "AgentIdentityRegistry": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "AgentReputationRegistry": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "AgentValidationRegistry": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    "ExampleValidator": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    "KayhanAIAgent": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+  },
+  "demoAgentId": null,
+  "deployedAt": "2026-10-17T14:57:44.559Z"
+}
+```
+
+> **Note:** `AgentReputationRegistry.sol` exceeds the EVM stack limit, so the
+> Hardhat configuration enables the optimizer together with the IR pipeline
+> (`viaIR: true`). Run `npx hardhat compile` first if you want to inspect the
+> build artifacts before deploying.
+
 ## Agent Registration File Format
 
 ```json
