@@ -509,48 +509,35 @@ describe("ERC-8004 AI Agent Example", async function () {
       );
     });
 
-    it("validates the star range in rateAgent", async function () {
+    it("does not expose a feedback entry point", async function () {
       const { demo } = await loadFixture(deployStack);
 
-      const agentId = await demo.registerAgent.staticCall("ipfs://QmDemo", "Demo", "model");
-      await (await demo.registerAgent("ipfs://QmDemo", "Demo", "model")).wait();
-
-      await expectRevert(() => demo.rateAgent(agentId, 0, ""), "stars must be 1-5");
-      await expectRevert(() => demo.rateAgent(agentId, 6, ""), "stars must be 1-5");
+      // ERC-8004 records the reviewer as `msg.sender` and blocks the agent owner
+      // and its operators from self-reviewing, so a forwarding contract can never
+      // submit feedback on a client's behalf. The demo therefore proxies nothing
+      // for feedback and only aggregates the resulting scores for reading.
+      assert.equal(demo.giveFeedback, undefined);
+      assert.equal(demo.rateAgent, undefined);
     });
 
-    it("records feedback from the demo facade under the demo contract as client", async function () {
-      const { identity, demo, alice, bob } = await loadFixture(deployStack);
-      const demoAddress = await demo.getAddress();
+    it("aggregates client feedback submitted directly to the reputation registry", async function () {
+      const { reputation, demo, bob } = await loadFixture(deployStack);
 
-      // Alice registers an agent directly, so the demo contract is *not* its owner.
-      const agentId = await identity.connect(alice)["register(string)"].staticCall("ipfs://QmAliceAgent");
-      await (await identity.connect(alice)["register(string)"]("ipfs://QmAliceAgent")).wait();
+      // The demo owns this agent (which is what lets it request validation)...
+      const agentId = await demo.registerAgent.staticCall("ipfs://QmDemo", "Demo", "gemini-2.5-pro");
+      await (await demo.registerAgent("ipfs://QmDemo", "Demo", "gemini-2.5-pro")).wait();
 
-      // Bob rates it through the demo facade.
-      await (await demo.connect(bob).rateAgent(agentId, 4, "https://agent.example/chat")).wait();
+      // ...and Bob, an independent client, reviews it straight on the registry.
+      await (
+        await reputation
+          .connect(bob)
+          .giveFeedback(agentId, 45n, 1, "starred", "week", "https://agent.example/chat", "", ethers.ZeroHash)
+      ).wait();
 
-      // The registry records `msg.sender` as the client, and for calls routed through
-      // the demo facade that sender is the demo contract — not the original rater.
-      const viaDemo = await demo.getAgentScore(agentId, [demoAddress], "", "");
-      assert.equal(viaDemo.count, 1n);
-      assert.equal(viaDemo.summaryValue, 4_000_000_000_000_000_000n); // 4 stars, normalised
-
-      const viaBob = await demo.getAgentScore(agentId, [bob.address], "", "");
-      assert.equal(viaBob.count, 0n);
-    });
-
-    it("blocks feedback for an agent the demo itself owns (ERC-8004 self-review guard)", async function () {
-      const { demo, bob } = await loadFixture(deployStack);
-
-      const agentId = await demo.registerAgent.staticCall("ipfs://QmDemo", "Demo", "model");
-      await (await demo.registerAgent("ipfs://QmDemo", "Demo", "model")).wait();
-
-      // `registerAgent` mints the agent to the demo contract, so the demo's own
-      // giveFeedback/rateAgent calls are rejected by the registry's self-review
-      // guard. Feedback for such an agent must come from a different client that
-      // talks to the reputation registry directly.
-      await expectRevert(() => demo.connect(bob).rateAgent(agentId, 5, ""), "owner cannot self-review");
+      const score = await demo.getAgentScore(agentId, [bob.address], "", "");
+      assert.equal(score.count, 1n);
+      assert.equal(score.summaryValue, 4_500_000_000_000_000_000n); // 4.5, normalised to 18 decimals
+      assert.equal(score.summaryValueDecimals, 18n);
     });
 
     it("runs the full validation flow: request -> validate -> read score", async function () {

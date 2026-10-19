@@ -26,13 +26,15 @@ pragma solidity ^0.8.20;
  * │  4. Deploy KayhanAIAgent(identity, reputation, validation)      │
  * │                                                                 │
  * │  The KayhanAIAgent owner can then:                              │
- * │    • registerAgent()   — mint a new agent NFT                   │
- * │    • updateAgentURI()  — update the agent's registration file   │
+ * │    • registerAgent()     — mint a new agent NFT                 │
+ * │    • updateAgentURI()    — update the agent's registration file │
  * │    • requestValidation() — request off-chain validation         │
  * │                                                                 │
  * │  Anyone can:                                                    │
- * │    • giveFeedback()    — submit reputation feedback             │
- * │    • getAgentScore()   — query aggregated reputation score      │
+ * │    • getAgentScore()     — query aggregated reputation score    │
+ * │                                                                 │
+ * │  Feedback is not proxied here (ERC-8004 binds the reviewer to   │
+ * │  msg.sender): clients call the Reputation Registry directly.    │
  * └─────────────────────────────────────────────────────────────────┘
  */
 
@@ -73,20 +75,15 @@ interface IAgentIdentityRegistry {
     function tokenURI(uint256 agentId) external view returns (string memory);
 }
 
+/**
+ * Read-only view of the reputation registry.
+ *
+ * The demo deliberately exposes no way to *write* feedback: ERC-8004 records
+ * the reviewer as `msg.sender`, so a forwarding contract can never submit
+ * feedback on behalf of a real client — the entry would be attributed to the
+ * contract itself. Clients call the registry directly.
+ */
 interface IAgentReputationRegistry {
-    function giveFeedback(
-        uint256 agentId,
-        int128 value,
-        uint8 valueDecimals,
-        string calldata tag1,
-        string calldata tag2,
-        string calldata endpoint,
-        string calldata feedbackURI,
-        bytes32 feedbackHash
-    ) external;
-
-    function revokeFeedback(uint256 agentId, uint64 feedbackIndex) external;
-
     function getSummary(
         uint256 agentId,
         address[] calldata clientAddresses,
@@ -146,15 +143,6 @@ contract KayhanAIAgent {
         uint256 indexed agentId,
         string agentURI,
         address indexed owner
-    );
-
-    /// @notice Emitted when feedback is submitted via this contract.
-    event FeedbackSubmitted(
-        uint256 indexed agentId,
-        address indexed client,
-        int128 value,
-        uint8 valueDecimals,
-        string tag1
     );
 
     /// @notice Emitted when a validation request is created via this contract.
@@ -233,6 +221,10 @@ contract KayhanAIAgent {
      * @param agentName Human-readable name stored on-chain for demo purposes.
      * @param modelName AI model identifier (e.g., "gemini-2.5-pro") — stored as metadata.
      *
+     * @dev    The agent NFT is minted to *this* contract, which is what lets it
+     *         call `requestValidation()`. Because the contract owns the agent it
+     *         must never review it — see the Reputation section below.
+     *
      * @return agentId  The ERC-721 tokenId of the newly registered agent.
      */
     function registerAgent(
@@ -284,87 +276,24 @@ contract KayhanAIAgent {
         identityRegistry.setMetadata(agentId, key, value);
     }
 
-    // ── Reputation ────────────────────────────────────────────────────────────
+    // ── Reputation (read-only) ────────────────────────────────────────────────
 
-    /**
-     * @notice Submit feedback for an agent.
-     *
-     *         Examples of value / valueDecimals:
-     *           Rating 4.5/5     → value=45, valueDecimals=1
-     *           Score 87/100     → value=87, valueDecimals=0
-     *           Uptime 99.77%    → value=9977, valueDecimals=2
-     *           Success 89%      → value=89, valueDecimals=0
-     *           Negative -3.2%   → value=-32, valueDecimals=1
-     *
-     * @param agentId       Target agent.
-     * @param value         Signed feedback value.
-     * @param valueDecimals Decimal scale (0-18).
-     * @param tag1          Primary taxonomy tag (e.g., "starred", "successRate", "uptime").
-     * @param tag2          Secondary tag (e.g., time window "week", "month").
-     * @param endpoint      Agent endpoint this feedback relates to (OPTIONAL).
-     * @param feedbackURI   Off-chain detail file URI (OPTIONAL, IPFS recommended).
-     * @param feedbackHash  keccak256 of feedbackURI content (OPTIONAL, not needed for IPFS).
-     */
-    function giveFeedback(
-        uint256 agentId,
-        int128 value,
-        uint8 valueDecimals,
-        string calldata tag1,
-        string calldata tag2,
-        string calldata endpoint,
-        string calldata feedbackURI,
-        bytes32 feedbackHash
-    ) external {
-        reputationRegistry.giveFeedback(
-            agentId,
-            value,
-            valueDecimals,
-            tag1,
-            tag2,
-            endpoint,
-            feedbackURI,
-            feedbackHash
-        );
-
-        emit FeedbackSubmitted(agentId, msg.sender, value, valueDecimals, tag1);
-    }
-
-    /**
-     * @notice Convenience: submit a simple star rating (1-5) for an agent.
-     * @param  agentId  Target agent.
-     * @param  stars    Star rating from 1 to 5.
-     * @param  endpoint OPTIONAL — agent endpoint the rating applies to.
-     */
-    function rateAgent(
-        uint256 agentId,
-        uint8 stars,
-        string calldata endpoint
-    ) external {
-        require(stars >= 1 && stars <= 5, "KayhanAIAgent: stars must be 1-5");
-        reputationRegistry.giveFeedback(
-            agentId,
-            int128(uint128(stars)), // e.g., 4 for ★★★★☆
-            0, // valueDecimals=0, so value is integer stars
-            "starred",
-            "",
-            endpoint,
-            "",
-            bytes32(0)
-        );
-        emit FeedbackSubmitted(
-            agentId,
-            msg.sender,
-            int128(uint128(stars)),
-            0,
-            "starred"
-        );
-    }
+    // Feedback is intentionally NOT proxied by this contract.
+    //
+    // AgentReputationRegistry records the reviewer as `msg.sender`, and blocks
+    // the agent's owner and its operators from self-reviewing. A forwarding
+    // contract can therefore never submit feedback *on behalf of* a real client:
+    // the entry would be attributed to the contract itself (and rejected outright
+    // whenever the contract owns the agent). Clients must call
+    // `AgentReputationRegistry.giveFeedback()` directly and self-identify as the
+    // reviewer. This contract only aggregates the resulting scores for reading.
 
     /**
      * @notice Read the aggregated reputation score for an agent across all clients.
      * @dev    Requires a non-empty clientAddresses list to prevent Sybil attacks
      *         (per ERC-8004 spec). Use the Reputation Registry's getClients() to
-     *         iteratively build trusted reviewer sets.
+     *         iteratively build trusted reviewer sets. The feedback entries
+     *         themselves are submitted directly to the Reputation Registry.
      *
      * @param agentId         Target agent.
      * @param clientAddresses Trusted reviewer whitelist.

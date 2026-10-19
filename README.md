@@ -13,7 +13,7 @@ This repository provides three production-ready smart contracts that together fo
 | `AgentIdentityRegistry.sol` | ERC-721-based identity. Each NFT token = one registered AI agent. |
 | `AgentReputationRegistry.sol` | Structured client feedback ledger with filtering, revocation, and summary aggregation. |
 | `AgentValidationRegistry.sol` | On-chain hooks for requesting and recording independent validation (zkML, TEE, stake re-execution). |
-| `kayhan_ai_agent.sol` | End-to-end demonstration: registers an agent, gives feedback, and requests validation. |
+| `kayhan_ai_agent.sol` | End-to-end demonstration: registers an agent, aggregates client feedback, and requests validation. |
 
 ### How Agent Identity Works
 
@@ -172,6 +172,33 @@ contract address:
 > Hardhat configuration enables the optimizer together with the IR pipeline
 > (`viaIR: true`). Run `npx hardhat compile` first if you want to inspect the
 > build artifacts before deploying.
+
+## Tests
+
+The suite lives in `test/AgentTests.ts` and runs on Hardhat 3's built-in
+`node:test` runner. Every test starts from a clean stack thanks to
+`@nomicfoundation/hardhat-network-helpers`' `loadFixture`, which snapshots the
+chain after the first deployment.
+
+```bash
+npx hardhat test                        # run everything
+npx hardhat test --grep "Reputation"    # only matching tests
+npx hardhat test test/AgentTests.ts     # a single file
+```
+
+| Suite | Covers |
+|---|---|
+| `AgentIdentityRegistry` | ERC-721 minting, registration metadata, agent URI, EIP-712 `setAgentWallet`, transfers |
+| `AgentReputationRegistry` | feedback lifecycle, 18-decimal normalisation, tags, revocation, responses |
+| `AgentValidationRegistry` | request/response lifecycle, authorization, aggregation |
+| `KayhanAIAgent` (end-to-end) | agent registration, reputation aggregation, full validation flow |
+
+> **Note:** `KayhanAIAgent` exposes no feedback function on purpose. ERC-8004
+> records the reviewer as `msg.sender` and blocks the agent's owner and its
+> operators from self-reviewing, so a forwarding contract can never submit
+> feedback *on behalf of* a client — the entry would be attributed to the
+> contract itself. Feedback always goes straight to `AgentReputationRegistry`;
+> `KayhanAIAgent` only aggregates the resulting scores for reading.
 
 ## Agent Registration File Format
 
