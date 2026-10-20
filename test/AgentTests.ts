@@ -509,6 +509,31 @@ describe("ERC-8004 AI Agent Example", async function () {
       );
     });
 
+    it("updates the registration file and metadata through the demo (owner only)", async function () {
+      const { identity, demo, alice } = await loadFixture(deployStack);
+
+      const agentId = await demo.registerAgent.staticCall("ipfs://QmDemo", "Demo", "gemini-2.5-pro");
+      await (await demo.registerAgent("ipfs://QmDemo", "Demo", "gemini-2.5-pro")).wait();
+
+      // Both wrappers are owner-only passthroughs to the identity registry.
+      await expectRevert(() => demo.connect(alice).updateAgentURI(agentId, "ipfs://QmHijacked"), "not owner");
+      await expectRevert(
+        () => demo.connect(alice).setAgentMetadata(agentId, "capability", ethers.toUtf8Bytes("hijacked")),
+        "not owner",
+      );
+
+      await (await demo.updateAgentURI(agentId, "ipfs://QmUpdated")).wait();
+      await (await demo.setAgentMetadata(agentId, "capability", ethers.toUtf8Bytes("summarise"))).wait();
+
+      assert.equal(await identity.tokenURI(agentId), "ipfs://QmUpdated");
+      assert.equal(ethers.toUtf8String(await identity.getMetadata(agentId, "capability")), "summarise");
+
+      // The demo's own view reads through to the updated registration file.
+      const info = await demo.getAgentInfo(agentId);
+      assert.equal(info.agentURI, "ipfs://QmUpdated");
+      assert.equal(ethers.toUtf8String(info.modelName), "gemini-2.5-pro"); // untouched by the update
+    });
+
     it("does not expose a feedback entry point", async function () {
       const { demo } = await loadFixture(deployStack);
 

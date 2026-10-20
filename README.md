@@ -191,7 +191,7 @@ npx hardhat test test/AgentTests.ts     # a single file
 | `AgentIdentityRegistry` | ERC-721 minting, registration metadata, agent URI, EIP-712 `setAgentWallet`, transfers |
 | `AgentReputationRegistry` | feedback lifecycle, 18-decimal normalisation, tags, revocation, responses |
 | `AgentValidationRegistry` | request/response lifecycle, authorization, aggregation |
-| `KayhanAIAgent` (end-to-end) | agent registration, reputation aggregation, full validation flow |
+| `KayhanAIAgent` (end-to-end) | agent registration, URI/metadata updates, reputation aggregation, full validation flow |
 
 > **Note:** `KayhanAIAgent` exposes no feedback function on purpose. ERC-8004
 > records the reviewer as `msg.sender` and blocks the agent's owner and its
